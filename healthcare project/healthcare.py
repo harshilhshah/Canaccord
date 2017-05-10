@@ -39,8 +39,15 @@ def soupTextIfNotNone(obj):
 		return obj.text
 	return obj
 
-def getEmptyCol(sheet):
-	for i in range(3,999):
+def getSheet(wb,sheetname):
+	if sheetname in wb.get_sheet_names():
+		return wb[sheetname]
+	ws = wb.create_sheet()
+	ws.title = sheetname
+	return ws
+
+def getEmptyCol(start_col, sheet):
+	for i in range(start_col,999):
 		val = sheet[get_column_letter(i)+'2'].value
 		if val is None or val == time.strftime("%m/%d/%y"):
 			return get_column_letter(i)
@@ -54,6 +61,15 @@ def getTotalIndex(sheet):
 		if str(val).lower().strip() == 'total count':
 			index =  i+1
 	return index
+
+def getStartIndex(sheet):
+	for i in range(1,sheet.max_row+1):
+		val = sheet['B'+str(i)].value
+		if val is None:
+			return i
+		if val == time.strftime("%m/%d/%y"):
+			return i
+	return i
 
 def get_zipcodes(sheet):
 	zipcodes = []
@@ -104,6 +120,50 @@ def addCities(cities,sheet):
 	for j in range(len(cities)):
 		sheet['A'+str(index+j)].value = cities[j]
 
+def getChanges(sheet,data,startIndex):
+	listOfDoctors = []
+	deltaDoctors = []
+	checkedDoctorsForDelete = []
+	for i in range(3,startIndex):
+		a_val =  str(sheet['B'+str(i)].value)
+		e_header = str(sheet['E2'].value)
+		val = str(sheet['B'+str(i)].value)
+		if val is None:
+			break
+		val += str(sheet['C'+str(i)].value)
+		if val.isdigit() or val[2] == '/': #want to skip if it's a number or a date
+			continue
+		val += str(sheet['D'+str(i)].value)
+		if a_val is not None and a_val == '-':
+			listOfDoctors.remove(val)
+			continue
+		listOfDoctors.append(val)
+	for row in data:
+		r = str(row[0]) + str(row[1]) + str(row[2])
+		checkedDoctorsForDelete.append(r)
+		if r not in listOfDoctors:
+			row.append('+')
+			deltaDoctors.append(row)
+	for doctor in listOfDoctors:
+		if doctor not in checkedDoctorsForDelete:
+			deltaDoctors.append()
+	return deltaDoctors
+
+def createDashboardSheet(wb):
+	dashboard = getSheet(wb, 'Dashboard')
+	dashboard['A1'].value = 'Discrete Doctors & Hospitals Returned'
+	dashboard['A3'].value = 'Discrete doctors'
+	dashboard['A4'].value = 'Discrete hospitals'
+	return dashboard
+
+def updateDashboard(filename, wb, doctors, hospitals):
+	dashboard = createDashboardSheet(wb)
+	ec = getEmptyCol(2, dashboard)
+	dashboard[ec+'2'].value = time.strftime("%m/%d/%y")
+	dashboard[ec+'3'].value = len(set(doctors))
+	dashboard[ec+'4'].value = len(set(hospitals))
+	wb.save(filename)
+
 
 def update_zip_info(filename,sheetname,wb,data,aggregate,aggregate_row_index):
 	if sheetname not in wb.get_sheet_names():
@@ -132,17 +192,42 @@ def update_zip_info(filename,sheetname,wb,data,aggregate,aggregate_row_index):
 	total = itr-2
 	ws['A'+str(startIndex+itr)].value = "Total count"
 	ws['B'+str(startIndex+itr)].value = total
-	ec = getEmptyCol(aggregate)
+	ec = getEmptyCol(3, aggregate)
 	aggregate[ec+'2'].value = time.strftime("%m/%d/%y")
 	aggregate[ec+str(aggregate_row_index)].value = total
 	wb.save(filename)
 
+def update_zip_info_new(filename,sheetname,wb,data,aggregate,aggregate_row_index):
+	ws = getSheet(wb,sheetname)
+	startIndex = getStartIndex(ws)
+	ws['A'+str(startIndex)].value = "Date queried"
+	ws['B'+str(startIndex)].value = time.strftime("%m/%d/%y")
+	ws['A'+str(startIndex+1)].value = "Added/Deleted"
+	ws['B'+str(startIndex+1)].value = "Doctor Name"
+	ws['C'+str(startIndex+1)].value = "Practice Name"
+	ws['D'+str(startIndex+1)].value = "Location"
+	ws['E'+str(startIndex+1)].value = "Contact information"
+	ws['F'+str(startIndex+1)].value = "Misc information"
+	itr = 2
+	for i,row in enumerate(getChanges(ws,data,startIndex)):
+		ws['A'+str(startIndex+itr)].value = row[5]
+		ws['B'+str(startIndex+itr)].value = remSpCh(row[0])
+		ws['C'+str(startIndex+itr)].value = remSpCh(row[1])
+		ws['D'+str(startIndex+itr)].value = remSpCh(row[2])
+		ws['E'+str(startIndex+itr)].value = remSpCh(row[3])
+		ws['F'+str(startIndex+itr)].value = remSpCh(row[4])
+		itr+=1
+	total = itr-2
+	ws['A'+str(startIndex+itr)].value = "Total Updated"
+	ws['B'+str(startIndex+itr)].value = total
+	ec = getEmptyCol(aggregate)
+	aggregate[ec+'2'].value = time.strftime("%m/%d/%y")
+	aggregate[ec+str(aggregate_row_index)].value = len(data)
+	wb.save(filename)
+	return 0
+
 def update_zip_info_stryker(filename,sheetname,wb,data,aggregate,aggregate_row_index,procedureMap):
-	if sheetname not in wb.get_sheet_names():
-		ws = wb.create_sheet()
-		ws.title = sheetname
-	else:
-		ws = wb[sheetname]
+	ws = getSheet(wb,sheetname)
 	startIndex = getTotalIndex(ws)
 	ws['A'+str(startIndex)].value = "Date queried"
 	ws['B'+str(startIndex)].value = time.strftime("%m/%d/%y")
@@ -172,11 +257,45 @@ def update_zip_info_stryker(filename,sheetname,wb,data,aggregate,aggregate_row_i
 	aggregate[ec+str(aggregate_row_index)].value = total
 	wb.save(filename)
 
+def update_zip_info_stryker_new(filename,sheetname,wb,data,aggregate,aggregate_row_index,procedureMap):
+	ws = getSheet(wb,sheetname)
+	startIndex = getStartIndex(ws)
+	ws['A'+str(startIndex)].value = "Date queried"
+	ws['B'+str(startIndex)].value = time.strftime("%m/%d/%y")
+	ws['A'+str(startIndex+1)].value = "Added/Deleted"
+	ws['B'+str(startIndex+1)].value = "Doctor Name"
+	ws['C'+str(startIndex+1)].value = "Practice Name"
+	ws['D'+str(startIndex+1)].value = "Location"
+	for item in sorted(procedureMap.items(), key=lambda (key,value): value):
+		ws[item[1]+str(startIndex+1)].value = item[0]
+	itr = 2
+	for i,row in enumerate(getChanges(ws,data,startIndex)):
+		ws['A'+str(startIndex+itr)].value = row[3]
+		ws['B'+str(startIndex+itr)].value = row[0]
+		ws['C'+str(startIndex+itr)].value = row[1]
+		ws['D'+str(startIndex+itr)].value = row[2]
+		for procedure in row[3]:
+			try:	
+				ws[procedureMap[procedure]+str(startIndex+itr)].value = 'x'
+			except:
+				continue
+		itr+=1
+	total = itr-2
+	ws['A'+str(startIndex+itr)].value = "Total count"
+	ws['B'+str(startIndex+itr)].value = total
+	ec = getEmptyCol(aggregate)
+	aggregate[ec+'2'].value = time.strftime("%m/%d/%y")
+	aggregate[ec+str(aggregate_row_index)].value = len(data)
+	wb.save(filename)
+	return 0
+
 def conformis():
 	excelFile = "Medtech Web script (ConforMIS).xlsx"
 	BASE_URL = "http://www.conformis.com/wp-admin/admin-ajax.php"
 	wb = load_workbook(filename = excelFile,data_only=True)
 	aggregate = wb["Aggregate"]
+	doctors = []
+	hospitals = []
 	for i,sheetname in enumerate(get_zipcodes(aggregate)):
 		print "Updating " + sheetname
 		zipcode = sheetname.split('-')[1].strip()
@@ -195,13 +314,18 @@ def conformis():
 			doc_distance = office['distance'] + " mi"
 			doc_contact = office['phone']
 			big_data.append([doc_name,doc_practice,doc_location,doc_contact,doc_distance])
+			doctors.append(doc_name)
+			hospitals.append(doc_practice)
 		update_zip_info(excelFile,sheetname,wb,big_data,aggregate,i+4)
+	updateDashboard(excelFile, wb, doctors, hospitals)
 
 def propel():
 	excelFile = "Medtech Web script (Intersect ENT).xlsx"
 	BASE_URL = "http://propelopens.com/locator/find-propel-physician/"
 	wb = load_workbook(filename = excelFile,data_only=True)
 	aggregate = wb["Aggregate"]
+	doctors = []
+	hospitals = []
 	for i,sheetname in enumerate(get_zipcodes(aggregate)):
 		print "Updating " + sheetname
 		zipcode = sheetname.split('-')[1].strip()
@@ -221,13 +345,18 @@ def propel():
 			except:
 				doc_contact = None
 			big_data.append([doc_name,doc_practice,doc_location,doc_contact,doc_distance])
+			doctors.append(doc_name)
+			hospitals.append(doc_practice)
 		update_zip_info(excelFile,sheetname,wb,big_data,aggregate,i+4)
+	updateDashboard(excelFile, wb, doctors, hospitals)
 
 def entellus():
 	excelFile = "Medtech Web script (Entellus).xlsx"
 	BASE_URL = "http://www.sinussurgeryoptions.com/find-a-doctor-results"
 	wb = load_workbook(filename = excelFile,data_only=True)
 	aggregate = wb["Aggregate"]
+	doctors = []
+	hospitals = []
 	for i,sheetname in enumerate(get_zipcodes(aggregate)):
 		print "Updating " + sheetname
 		zipcode = sheetname.split('-')[1].strip()
@@ -251,13 +380,18 @@ def entellus():
 				else:
 					doc_contact = '(' + split_arr[1].strip()
 				big_data.append([doc_name,doc_practice,doc_location,doc_contact,doc_distance])
+			doctors.append(doc_name)
+			hospitals.append(doc_practice)
 		update_zip_info(excelFile,sheetname,wb,big_data,aggregate,i+4)
+	updateDashboard(excelFile, wb, doctors, hospitals)
 
 def zeltiq():
 	excelFile = "Medtech Web script (Zeltiq).xlsx"
 	BASE_URL = "http://www.sinussurgeryoptions.com/find-a-doctor-results"
 	wb = load_workbook(filename = excelFile,data_only=True)
 	aggregate = wb["Aggregate"]
+	doctors = []
+	hospitals = []
 	for i,sheetname in enumerate(get_zipcodes(aggregate)):
 		big_data = []
 		print "Updating " + sheetname
@@ -276,13 +410,18 @@ def zeltiq():
 			doc_contact = office['phone']
 			doc_distance = "{:.2f} mi".format(float(office['distance']) * 0.62137)
 			big_data.append([doc_name,doc_practice,doc_location,doc_contact,doc_distance])
+			doctors.append(doc_name)
+			hospitals.append(doc_practice)
 		update_zip_info(excelFile,sheetname,wb,big_data,aggregate,i+4)
+	updateDashboard(excelFile, wb, doctors, hospitals)
 
 def orbera():
 	excelFile = "Medtech Web script (Orbera).xlsx"
 	BASE_URL = "https://www.orbera.com/apexremote"
 	wb = load_workbook(filename = excelFile,data_only=True)
 	aggregate = wb["Aggregate"]
+	doctors = []
+	hospitals = []
 	for i,sheetname in enumerate(get_zipcodes(aggregate)):
 		big_data = []
 		print "Updating " + sheetname
@@ -317,7 +456,10 @@ def orbera():
 			loc2 = (ofv['Location__Latitude__s'],ofv['Location__Longitude__s'])
 			doc_distance = str(vincenty(loc1, loc2).miles) + " mi"
 			big_data.append([doc_name,doc_practice,doc_location,doc_contact,doc_distance])
+			doctors.append(doc_name)
+			hospitals.append(doc_practice)
 		update_zip_info(excelFile,sheetname,wb,big_data,aggregate,i+4)
+	updateDashboard(excelFile, wb, doctors, hospitals)
 
 def reshape():
 	excelFile = "Medtech Web script (Reshape).xlsx"
@@ -325,6 +467,8 @@ def reshape():
 	wb = load_workbook(filename = excelFile,data_only=True)
 	aggregate = wb["Aggregate"]
 	regex = re.compile(ur'dataFAC = {([^}]*)}')
+	doctors = []
+	hospitals = []
 	for i,sheetname in enumerate(get_zipcodes(aggregate)):
 		big_data = []
 		print "Updating " + sheetname
@@ -351,7 +495,10 @@ def reshape():
 			if doc_contact:
 				doc_contact = doc_contact.group(0).replace("phone:\"",'')
 			big_data.append([doc_name,doc_practice,doc_location,doc_contact,doc_distance])
+			doctors.append(doc_name)
+			hospitals.append(doc_practice)
 		update_zip_info(excelFile,sheetname,wb,big_data,aggregate,i+4)
+	updateDashboard(excelFile, wb, doctors, hospitals)
 
 
 def obalon():
@@ -365,6 +512,8 @@ def obalon():
 	cities = [x for x in cities if x not in prev_cities]
 	addCities(cities,aggregate)
 	wb.save(excelFile)
+	doctors = []
+	hospitals = []
 	if len(prev_cities) == 0:
 		prev_cities = cities
 	for i,sheetname in enumerate(prev_cities):
@@ -383,13 +532,18 @@ def obalon():
 			doc_location = office['address'] + ' ' + office['city'] + ', ' + office['state'] + ' ' + office['zip']
 			doc_contact = office['data']['sl_phone']
 			big_data.append([doc_name,doc_practice,doc_location,doc_contact,''])
+			doctors.append(doc_name)
+			hospitals.append(doc_practice)
 		update_zip_info(excelFile,sheetname,wb,big_data,aggregate,i+4)
+	updateDashboard(excelFile, wb, doctors, hospitals)
 
 def stryker():
 	BASE_URL = "https://patients.stryker.com/surgeons/?distance=100&search="
 	excelFile = "Medtech Web script (Stryker).xlsx"
 	wb = load_workbook(filename = excelFile,data_only=True)
 	aggregate = wb["Aggregate"]
+	doctors = []
+	hospitals = []
 	for i,sheetname in enumerate(get_zipcodes(aggregate)):
 		big_data = []
 		zipcode = sheetname.split('-')[1].strip()
@@ -405,14 +559,19 @@ def stryker():
 				doc_location = soupTextIfNotNone(row.find('li',{'class':'surgeonAddress'}))
 				doc_procedures = [x.text for x in row.find_all('span',{'class':'badge'})]
 				big_data.append([doc_name,doc_practice,doc_location,doc_procedures])
+				doctors.append(doc_name)
+				hospitals.append(doc_practice)
 			j += 1
 		update_zip_info_stryker(excelFile,sheetname,wb,big_data,aggregate,i+4,procedureToColMapStryker)
+	updateDashboard(excelFile, wb, doctors, hospitals)
 
 def smithAndNephew():
 	BASE_URL = "http://www.rediscoveryourgo.com/findadoctor.aspx?zipcode="
 	excelFile = "Medtech Web script (Smith&Nephew).xlsx"
 	wb = load_workbook(filename = excelFile,data_only=True)
 	aggregate = wb["Aggregate"]
+	doctors = []
+	hospitals = []
 	for i,sheetname in enumerate(get_zipcodes(aggregate)):
 		big_data = []
 		names = []
@@ -433,12 +592,14 @@ def smithAndNephew():
 					doc_location = ''
 				doc_procedures = [x.text for x in listing.find('div',{'class':'badges'}).find_all('a')]
 				big_data.append([doc_name,doc_practice,doc_location,doc_procedures])
+				doctors.append(doc_name)
+				hospitals.append(doc_practice)
 		update_zip_info_stryker(excelFile,sheetname,wb,big_data,aggregate,i+4,procedureToColMapSmithAndNephew)
-
+	updateDashboard(excelFile, wb, doctors, hospitals)
 
 
 print "\nScraping Company 1 (ConforMIS):"
-#conformis()
+conformis()
 print "\n\nScraping Company 2 (Intersect ENT):"
 propel()
 print "\n\nScraping Company 3 (Entellus):"
