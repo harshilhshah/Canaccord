@@ -100,13 +100,13 @@ def getUniqueCountForProcedure(wb,dashboard,procedure):
 	procedureMap = {}
 	letter_index =  7
 	while ws[get_column_letter(letter_index)+str(1)].value is not None:
-		procedureMap[ws[get_column_letter(letter_index)+str(1)].value] = get_column_letter(letter_index)
+		procedureMap[ws[get_column_letter(letter_index)+str(1)].value.upper()] = get_column_letter(letter_index)
 		letter_index += 1
 	uniqueList = []
 	for i in range(2,ws.max_row+2):
-		val = ws[procedureMap[procedure]+str(i)].value
-		if val is not None and val == procedure:
-			uniqueList.append(ws['B'+str(i)].value)
+		val = ws[procedureMap[procedure.upper()]+str(i)].value
+		if val is not None and val == 'x':
+			uniqueList.append(ws['B'+str(i)].value+"|"+ws['C'+str(i)].value)
 	return len(set(uniqueList))
 
 def updateDashboard(filename, wb):
