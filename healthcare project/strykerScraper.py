@@ -91,7 +91,7 @@ def getChanges(sheet,data,startIndex):
 	for doctor in listOfDoctors:
 		if doctor.split('|')[2] == data[0][2] and doctor not in checkedDoctorsForDelete:
 			doctor_d = doctor
-			doctor_d += '| |' + date + '|-' 
+			doctor_d += '| |' + date + '| |-' 
 			deltaDoctors.append(doctor_d.split('|'))
 	return deltaDoctors
 
@@ -152,6 +152,8 @@ def update_zip_info_stryker_new(filename,wb,data):
 		ws['E'+str(startIndex+i)].value = str(row[3])
 		ws['F'+str(startIndex+i)].value = str(row[4])
 		for procedure in row[5]:
+			if len(procedure.strip()) == 0:
+				continue
 			try:	
 				ws[procedureMap[procedure.upper()]+str(startIndex+i)].value = 'x'
 			except:
@@ -168,7 +170,7 @@ def stryker():
 	doctors = []
 	hospitals = []
 	date = time.strftime("%m/%d/%y")
-	for sheetname in get_zipcodes(zipcodeDB):
+	for sheetname in get_zipcodes(zipcodeDB)[2:]:
 		big_data = []
 		j = 1
 		zipcode = sheetname.split('-')[1].strip()
