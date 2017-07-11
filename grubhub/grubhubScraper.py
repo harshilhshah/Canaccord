@@ -4,6 +4,14 @@ def remSpCh(s):
 	s = unicodedata.normalize('NFKD', s).encode('ascii','ignore')
 	return ''.join([i for i in s if ord(i) < 128])
 
+def isRestaurantDeliveryOrPickup(delivery,pickup):
+	if delivery and pickup:
+		return 'Both'
+	elif delivery:
+		return 'Delivery Only'
+	else:
+		return 'Pickup Only'
+
 def webscraper(point):
 	restaurants = []
 	uniq_id_arr = []
@@ -30,10 +38,11 @@ def webscraper(point):
 		rating_count = str(restaurant['ratings']['rating_count'])
 		min_order = '$' + str(restaurant['delivery_minimum']['price'])[:-2]
 		min_delivery_fee = '$' + str(restaurant['min_delivery_fee']['price'])[:-2]
+		deliveryOrPickupText = isRestaurantDeliveryOrPickup(restaurant['delivery'],restaurant['pickup'])
 		if min_delivery_fee == '$':
 			min_delivery_fee = 'Free'
 		uniq_id_arr.append(uniq_id)
-		restaurants.append([addr,name,rating,rating_count,'Delivery Only',min_order,min_delivery_fee,uniq_id])
+		restaurants.append([addr,name,rating,rating_count,deliveryOrPickupText,min_order,min_delivery_fee,uniq_id])
 	# time to scrape restaurants from the pickup tab
 	url = url.replace('delivery','pickup').replace('DELIVERY','PICKUP')
 	try:
@@ -55,7 +64,8 @@ def webscraper(point):
 			addr = restaurant['address']['street_address']
 			rating = str(restaurant['ratings']['rating_bayesian_half_point'])
 			rating_count = str(restaurant['ratings']['rating_count'])
-			restaurants.append([addr,name,rating,rating_count,'Pickup Only','','',uniq_id])
+			deliveryOrPickupText = isRestaurantDeliveryOrPickup(restaurant['delivery'],restaurant['pickup'])
+			restaurants.append([addr,name,rating,rating_count,deliveryOrPickupText,'','',uniq_id])
 	return restaurants
 
 def getZipCodes(file):
@@ -114,7 +124,9 @@ for zip_with_loc_row in getZipCodesWithLatLong('ZipTableWithLoc.csv')[:]:
 	try:
 		for restaurant in webscraper(point):
 			writeData('RestaurantData.csv','a',[zipcode,city,state] + restaurant)
-	except:
+	except Exception as e:
+		print "*******ERROR:An error occured:*********" 
+		print e
 		continue
 
 print("\n\nExecution Time: --- %2.f seconds ---\n" % (time.time() - start_time))
