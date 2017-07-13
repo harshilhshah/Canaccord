@@ -91,44 +91,22 @@ def getChanges(sheet,data,startIndex):
 	for doctor in listOfDoctors:
 		if doctor.split('|')[2] == data[0][2] and doctor not in checkedDoctorsForDelete:
 			doctor_d = doctor
-			doctor_d += '| |' + date + '| |-' 
+			doctor_d += '| |' + date + '|-' 
 			deltaDoctors.append(doctor_d.split('|'))
 	return deltaDoctors
 
-def getUniqueCountForProcedure(wb,dashboard,procedure):
-	ws = getSheet(wb, 'Docs')
-	procedureMap = {}
-	letter_index =  7
-	while ws[get_column_letter(letter_index)+str(1)].value is not None:
-		procedureMap[ws[get_column_letter(letter_index)+str(1)].value.upper()] = get_column_letter(letter_index)
-		letter_index += 1
-	uniqueList = []
-	for i in range(2,ws.max_row+2):
-		val = ws[procedureMap[procedure.upper()]+str(i)].value
-		if val is not None and val == 'x':
-			uniqueList.append(ws['B'+str(i)].value+"|"+ws['C'+str(i)].value)
-	return len(set(uniqueList))
-
-def updateDashboard(filename, wb):
+def updateDashboard(filename, wb, doctors, hospitals):
 	dashboard = getSheet(wb, 'Dashboard')
+	dashboard['A2'].value = 'Discrete doctors'
+	dashboard['A3'].value = 'Discrete hospitals'
 	ec = getEmptyCol(2, dashboard)
 	dashboard[ec+'1'].value = time.strftime("%m/%d/%y")
-	itr = 2
-	while dashboard['A'+str(itr)].value is not None:
-		procedure = dashboard['A'+str(itr)].value 
-		dashboard[ec+str(itr)].value = getUniqueCountForProcedure(wb,dashboard,procedure)
-		itr += 1
-	while dashboard['A'+str(itr)].value != 'Hospital':
-		itr += 1
-	itr += 1
-	while dashboard['A'+str(itr)].value is not None:
-		procedure = dashboard['A'+str(itr)].value 
-		dashboard[ec+str(itr)].value = getUniqueCountForProcedure(wb,dashboard,procedure)
-		itr += 1
+	dashboard[ec+'2'].value = len(set(doctors))
+	dashboard[ec+'3'].value = len(set(hospitals))
 	wb.save(filename)
 
 def update_zip_info_stryker_new(filename,wb,data):
-	ws = getSheet(wb,'Docs')
+	ws = getSheet(wb,'NAVIO Docs')
 	startIndex = getStartIndex(ws)
 	if ws['A'+str(1)].value is None:
 		ws['A'+str(1)].value = "+/-"
@@ -137,34 +115,19 @@ def update_zip_info_stryker_new(filename,wb,data):
 		ws['D'+str(1)].value = "Zipcode - City"
 		ws['E'+str(1)].value = "Address"
 		ws['F'+str(1)].value = "Date added"
-		for item in sorted(baseProcedureToColMapStryker.items(), key=lambda (key,value): value):
-			ws[item[1]+str(startIndex+1)].value = item[0]
-	procedureMap = {}
-	letter_index =  7
-	while ws[get_column_letter(letter_index)+str(1)].value is not None:
-		procedureMap[ws[get_column_letter(letter_index)+str(1)].value.upper()] = get_column_letter(letter_index)
-		letter_index += 1
 	for i,row in enumerate(getChanges(ws,data,startIndex)):
-		ws['A'+str(startIndex+i)].value = str(row[6])
+		ws['A'+str(startIndex+i)].value = str(row[5])
 		ws['B'+str(startIndex+i)].value = str(row[0])
 		ws['C'+str(startIndex+i)].value = str(row[1])
 		ws['D'+str(startIndex+i)].value = str(row[2])
 		ws['E'+str(startIndex+i)].value = str(row[3])
 		ws['F'+str(startIndex+i)].value = str(row[4])
-		for procedure in row[5]:
-			if len(procedure.strip()) == 0:
-				continue
-			try:	
-				ws[procedureMap[procedure.upper()]+str(startIndex+i)].value = 'x'
-			except:
-				print "Error: There's no such column: " + procedure + ". Please add a column with this name"
-				continue
 	wb.save(filename)
 	return 0
 
-def stryker():
-	BASE_URL = "https://patients.stryker.com/surgeons/?distance=100&techs%5Bknee%5D=1&techs%5Bhip%5D=1&search="
-	excelFile = "Stryker.xlsx"
+def smithAndNephew():
+	BASE_URL = "http://www.rediscoveryourgo.com/findadoctor.aspx?zipcode="
+	excelFile = "Medtech Web script (Smith&Nephew).xlsx"
 	wb = load_workbook(filename = excelFile,data_only=True)
 	zipcodeDB = wb['Zipcodes']
 	doctors = []
@@ -172,24 +135,25 @@ def stryker():
 	date = time.strftime("%m/%d/%y")
 	for sheetname in get_zipcodes(zipcodeDB)[:]:
 		big_data = []
-		j = 1
+		names = []
 		zipcode = sheetname.split('-')[1].strip()
 		print "Scraping data for " + sheetname
-		while True:
-			soup = getWebData(BASE_URL+zipcode+'&page='+str(j))
-			if soup.find('div',{'class':'listing'}) is None:
-				break
-			for row in soup.find_all('div',{'class':'listing'}):
-				doc_name = soupTextIfNotNone(row.find('span',{'class':'surgeonName'}))
-				doc_practice = soupTextIfNotNone(row.find('div',{'class':'practiceName'}))
-				doc_location = soupTextIfNotNone(row.find('li',{'class':'surgeonAddress'}))
-				doc_procedures = [x.text for x in row.find_all('span',{'class':'badge'})]
-				big_data.append([doc_name,doc_practice,sheetname,doc_location,date,doc_procedures])
-				doctors.append(doc_name)
-				hospitals.append(doc_practice)
-			j += 1
+		soup = getWebData(BASE_URL+zipcode+'&product=36')
+		for listing in soup.find_all('div',{'class':'listing-container'}):
+			doc_name = remSpCh(listing.find('h2').text.strip())
+			if doc_name in names:
+				continue
+			names.append(doc_name)
+			doc_practice = remSpCh(listing.find('p').text.split(' ')[0].strip())
+			try:
+				doc_location = ','.join(listing.find('p').text.split('\n')[1:3]).replace(' ','')
+			except:
+				doc_location = ''
+			big_data.append([doc_name,doc_practice,sheetname,doc_location,date])
+			doctors.append(doc_name)
+			hospitals.append(doc_practice)
 		update_zip_info_stryker_new(excelFile,wb,big_data)
-	updateDashboard(excelFile, wb)
+	updateDashboard(excelFile,wb,doctors,hospitals)
 
-stryker()
+smithAndNephew()
 print("\n\nExecution Time: --- %2.f seconds ---\n" % (time.time() - start_time))
