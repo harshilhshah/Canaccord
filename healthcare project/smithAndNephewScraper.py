@@ -144,9 +144,9 @@ def smithAndNephew():
 			if doc_name in names:
 				continue
 			names.append(doc_name)
-			doc_practice = remSpCh(listing.find('p').text.split(' ')[0].strip())
+			doc_practice = remSpCh(listing.find('p').text.split('  ')[0].strip())
 			try:
-				doc_location = ','.join(listing.find('p').text.split('\n')[1:3]).replace(' ','')
+				doc_location = ','.join(listing.find('p').text.split('        ')[1:5]).replace(',',' ').strip()
 			except:
 				doc_location = ''
 			big_data.append([doc_name,doc_practice,sheetname,doc_location,date])
