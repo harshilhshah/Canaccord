@@ -18,7 +18,9 @@ def webscraper(point):
 	global auth_token
 	auth_url = "https://api-gtm.grubhub.com/auth"
 	auth_payload = {"brand":"GRUBHUB","client_id":"beta_UmWlpstzQSFmocLy3h1UieYcVST","device_id":-1512757421,"scope":"anonymous"}
-	url = "https://api-gtm.grubhub.com/restaurants/search/search_listing?orderMethod=delivery&locationMode=DELIVERY&facetSet=umami&pageSize=1000&hideHateos=true&location=POINT("+point+")&facet=variationId=default-impressionScoreBase-20160712&countOmittingTimes=true"
+	url = "https://api-gtm.grubhub.com/restaurants/search/search_listing?orderMethod=delivery&locationMode=DELIVERY&facetSet=umami"
+	url += "&pageSize=1000&hideHateos=true&location=POINT("+point+")&facet=variationId=default-impressionScoreBase-20160712" 
+	url += "&sponsoredSize=300&countOmittingTimes=true"
 	headers = {'Accept':'application/json','Content-Type':'application/json','Authorization': auth_token}
 	application_json = {'Content-Type':'application/json'}
 	try:
@@ -28,7 +30,7 @@ def webscraper(point):
 		auth_token = "Bearer " + json.loads(r.text)['session_handle']['access_token']
 		headers = {'Accept':'application/json','Authorization':auth_token}
 		json_text = json.loads(requests.get(url,headers=headers).text)
-	if len(json_text) < 5:
+	if len(json_text) < 1:
 		return restaurants
 	for restaurant in json_text['results']:
 		uniq_id = str(restaurant['restaurant_id'])
@@ -42,7 +44,21 @@ def webscraper(point):
 		if min_delivery_fee == '$':
 			min_delivery_fee = 'Free'
 		uniq_id_arr.append(uniq_id)
-		restaurants.append([addr,name,rating,rating_count,deliveryOrPickupText,min_order,min_delivery_fee,uniq_id])
+		restaurants.append([addr,name,rating,rating_count,deliveryOrPickupText,min_order,min_delivery_fee,uniq_id,'No'])
+	if json_text['sponsored_result'] is not None:
+		for restaurant in json_text['sponsored_result']['results']:
+			uniq_id = str(restaurant['restaurant_id'])
+			name = remSpCh(restaurant['name'])
+			addr = restaurant['address']['street_address']
+			rating = str(restaurant['ratings']['rating_bayesian_half_point'])
+			rating_count = str(restaurant['ratings']['rating_count'])
+			min_order = '$' + str(restaurant['delivery_minimum']['price'])[:-2]
+			min_delivery_fee = '$' + str(restaurant['min_delivery_fee']['price'])[:-2]
+			deliveryOrPickupText = isRestaurantDeliveryOrPickup(restaurant['delivery'],restaurant['pickup'])
+			if min_delivery_fee == '$':
+				min_delivery_fee = 'Free'
+			uniq_id_arr.append(uniq_id)
+			restaurants.append([addr,name,rating,rating_count,deliveryOrPickupText,min_order,min_delivery_fee,uniq_id,'Yes'])
 	# time to scrape restaurants from the pickup tab
 	url = url.replace('delivery','pickup').replace('DELIVERY','PICKUP')
 	try:
@@ -65,7 +81,19 @@ def webscraper(point):
 			rating = str(restaurant['ratings']['rating_bayesian_half_point'])
 			rating_count = str(restaurant['ratings']['rating_count'])
 			deliveryOrPickupText = isRestaurantDeliveryOrPickup(restaurant['delivery'],restaurant['pickup'])
-			restaurants.append([addr,name,rating,rating_count,deliveryOrPickupText,'','',uniq_id])
+			restaurants.append([addr,name,rating,rating_count,deliveryOrPickupText,'','',uniq_id,'No'])
+	if json_text['sponsored_result'] is not None:
+		for restaurant in json_text['sponsored_result']['results']:
+			try:
+				index = uniq_id_arr.index(uniq_id)
+				restaurant[index][4] = 'Both'
+			except:
+				name = remSpCh(restaurant['name'])
+				addr = restaurant['address']['street_address']
+				rating = str(restaurant['ratings']['rating_bayesian_half_point'])
+				rating_count = str(restaurant['ratings']['rating_count'])
+				deliveryOrPickupText = isRestaurantDeliveryOrPickup(restaurant['delivery'],restaurant['pickup'])
+				restaurants.append([addr,name,rating,rating_count,deliveryOrPickupText,'','',uniq_id,'Yes'])
 	return restaurants
 
 def getZipCodes(file):
@@ -109,11 +137,11 @@ def getLatLng(city,state,zipcode):
 	return (lat,lng)
 
 start_time = time.time()
-header_row = ['Zip','City','State','Address','Restaurant Name','Rating','Number of Ratings','Delivery/Pickup','Minimum Order','Delivery Fee','Unique ID']
+header_row = ['Zip','City','State','Address','Restaurant Name','Rating','Number of Ratings','Delivery/Pickup','Minimum Order','Delivery Fee','Unique ID','Sponsored?']
 writeData('RestaurantData.csv','w',header_row)
 auth_token = ""
 
-for zip_with_loc_row in getZipCodesWithLatLong('ZipTableWithLoc.csv')[:]:
+for zip_with_loc_row in getZipCodesWithLatLong('ZipTableWithLoc.csv')[3445:]:
 	zipcode = zip_with_loc_row[0]
 	print zipcode
 	city = zip_with_loc_row[1]
