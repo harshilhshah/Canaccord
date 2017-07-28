@@ -83,7 +83,7 @@ for state in soup.find_all('li',{'class':'c-directory-list-content-item'}):
 		print "\tScraping " + city.a.text
 		if count != '1':
 			for location in soup.find_all('a',{'class':' c-location-grid-item-link-visit'}):
-				soup = getWebData(BASE_URL + location['href'])
+				soup = getWebData(BASE_URL + location['href'].replace('../',''))
 				big_data.append(extractDetails(soup, city.a.text, state.a.text))
 		else:
 			big_data.append(extractDetails(soup, city.a.text, state.a.text))
