@@ -12,8 +12,8 @@ import unicodedata
 start_time = time.time()
 date = time.strftime("%m/%d/%y")
 
-def getWebData(link):
-    return BeautifulSoup(requests.get(link).text,'html.parser')
+def getWebData(link,headers,payload):
+    return BeautifulSoup(requests.post(link,headers=headers,data=payload).text,'html.parser')
 
 def remSpCh(s):
 	if s is None:
@@ -133,17 +133,29 @@ def sientra():
 	for zipcode in get_zipcodes(zipcodeDB):
 		big_data = []
 		print "Scraping data for " + zipcode
-		payload = {'radius':5, 'pagesizing':30, 'currentpage':1, 'zipcode':zipcode}
-		soup = BeautifulSoup(requests.post(BASE_URL,headers=headers,data=payload).text,'html.parser')
-		data = soup.find('script').text.split('=')[-1].split(';')[-2].strip()
-		cleanData = cleanhtml(data).replace('\/','')
-		jsonData = json.loads(cleanData)
-		for doctor in jsonData['Doctors']:
-			doc_name = doctor['Name']
-			doc_location = doctor['Address']
-			doc_contact = doctor['Phone']
-			big_data.append([doc_name,zipcode,doc_location,date,doc_contact])
-			doctors.append(doc_name)
+		lastPage = False
+		pageNum = 1
+		while not lastPage:
+			payload = {'radius':5, 'pagesizing':30, 'currentpage':pageNum, 'zipcode':zipcode}
+			try:
+				soup = getWebData(BASE_URL,headers,payload)
+			except:
+				print "[ERROR] Couldn't hit the url for " + zipcode
+				continue
+			data = soup.find('script').text.split('=')[-1].split(';')[-2].strip()
+			cleanData = cleanhtml(data).replace('\/','')
+			jsonData = json.loads(cleanData)
+			if jsonData['Result'] == False:
+				lastPage = True
+				continue
+			if jsonData['NumberOfPages'] - pageNum == 0:
+				lastPage = True
+			for doctor in jsonData['Doctors']:
+				doc_name = doctor['Name']
+				doc_location = doctor['Address']
+				doc_contact = doctor['Phone']
+				big_data.append([doc_name,zipcode,doc_location,date,doc_contact])
+				doctors.append(doc_name)
 		update_zip_info(excelFile,wb,big_data)
 	updateDashboard(excelFile, wb, doctors)
 
