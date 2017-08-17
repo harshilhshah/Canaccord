@@ -142,8 +142,12 @@ def obalon_new():
 		print "Updating " + sheetname
 		headers = {'Content-Type':'application/x-www-form-urlencoded'}
 		params = "formdata=addressInput%3D"+city_text+"%26nameSearch%3D%26addressInputCity%3D%26addressInputState%3D%26addressInputCountry%3D%26ignore_radius%3D0&lat="+lat+"&lng="+lng+"&radius=100&action=csl_ajax_search"
-		r = requests.post("http://www.obalon.com/wp-admin/admin-ajax.php",headers=headers,data=params)
-		office_arr = json.loads(r.text)["response"]
+		try:
+			r = requests.post("http://www.obalon.com/wp-admin/admin-ajax.php",headers=headers,data=params)
+			office_arr = json.loads(r.text)["response"]
+		except:
+			print "Error: Couldn't scrape data for " + sheetname
+			continue
 		for office in office_arr:
 			doc_name = remSpCh(office['name'])
 			try:
