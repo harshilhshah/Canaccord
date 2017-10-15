@@ -126,7 +126,7 @@ def entellus():
 	date = time.strftime("%m/%d/%y")
 	for zipcode in get_zipcodes(zipcodeDB):
 		print "Updating " + zipcode
-		url = BASE_URL + "?distance%5Bpostal_code%5D="+zipcode+"&distance%5Bsearch_distance%5D=100&distance%5Bsearch_units%5D=mile"
+		url = BASE_URL + "?distance%5Bpostal_code%5D="+zipcode+"&distance%5Bsearch_distance%5D=25&distance%5Bsearch_units%5D=mile"
 		soup = getWebData(url)
 		big_data = []
 		if soup.find('table') is not None:

@@ -144,7 +144,7 @@ def orbera():
 		time.sleep(1)	
 		loc = zipcodeCoordinatesMap[zipcode]
 		headers = {'Content-Type':'application/json', 'Referer':'https://www.orbera.com/find-a-specialist'}
-		loc_str = str(loc[0]) + ":" + str(loc[1]) + ":mi:100:Any:undefined:abc@xyz.com"
+		loc_str = str(loc[0]) + ":" + str(loc[1]) + ":mi:25:Any:undefined:abc@xyz.com"
 		csrf = "VmpFPSxNakF4Tmkwd09DMHhNRlF4TkRvMU5qb3pNaTQ1TnpCYSxmLUR2dEJrRFJ2czVSUGR2WV8yNVVzLE5tVTRNamRq"
 		data = "{'data': ['"+loc_str+"', '1', 'Orbera'], 'ctx': {'ns': '', 'ver': 28, 'vid': '066500000006Ka9', 'csrf': '"+csrf+"'}, 'tid': 2, 'action': 'LWFindSpecialistController', 'type': 'rpc', 'method': 'getOfficeByPage'}"
 		r = requests.post(BASE_URL,headers=headers,data=data)

@@ -141,8 +141,13 @@ def reshape():
 	for zipcode in get_zipcodes(zipcodeDB):
 		big_data = []
 		print "Updating " + zipcode
-		soup = getWebData(BASE_URL+"tc_search="+zipcode+"&tc_radius=100")
+		soup = getWebData(BASE_URL+"tc_search="+zipcode+"&tc_radius=50")
 		for office in re.findall(regex, soup.text):
+			doc_distance = re.search("dist:\"([^\"]*)",office)
+			if doc_distance:
+				doc_distance = doc_distance.group(0).replace("dist:\"",'').strip()
+				if int(doc_distance) > 25:
+					continue
 			doc_name = re.search("name:\"([^\"]*)",office)
 			doc_location = re.search("address(.*)longitude",office)
 			doc_contact = re.search("phone:\"([^\"]*)",office)

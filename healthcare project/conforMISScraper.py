@@ -142,7 +142,7 @@ def conformis():
 		print "Updating " + zipcode
 		headers={'Content-Type':'application/x-www-form-urlencoded'}
 		loc = zipcodeCoordinatesMap[zipcode]
-		data = {'address':zipcode,'lat':loc[0],'lng':loc[1],'radius':100,'action':'csl_ajax_search'}
+		data = {'address':zipcode,'lat':loc[0],'lng':loc[1],'radius':25,'action':'csl_ajax_search'}
 		r = requests.post(BASE_URL,headers=headers,data=data)
 		office_arr = json.loads(r.text)['response']
 		big_data = []
