@@ -134,30 +134,25 @@ def conformis():
 	BASE_URL = "http://www.conformis.com/wp-admin/admin-ajax.php"
 	wb = load_workbook(filename = excelFile,data_only=True)
 	zipcodeDB = wb['Zipcodes']
-	zipcodeCoordinatesMap = readZipCodes()
+	zipcodeCoordinates = readZipCodes()
 	doctors = []
-	hospitals = []
 	date = time.strftime("%m/%d/%y")
 	for zipcode in get_zipcodes(zipcodeDB):
 		print "Updating " + zipcode
 		headers={'Content-Type':'application/x-www-form-urlencoded'}
-		loc = zipcodeCoordinatesMap[zipcode]
-		data = {'address':zipcode,'lat':loc[0],'lng':loc[1],'radius':25,'action':'csl_ajax_search'}
+		loc = zipcodeCoordinates[zipcode]
+		data = {'address':zipcode,'lat':loc[0],'lng':loc[1],'radius':25,'action':'csl_ajax_search', 'formdata':'addressInput='+zipcode+'&nameSearch=&cat=&catsel_0=&addressInputCity=&ignore_radius=0'}
 		r = requests.post(BASE_URL,headers=headers,data=data)
 		office_arr = json.loads(r.text)['response']
 		big_data = []
 		for office in office_arr:
-			if float(office['distance']) > 25:
-				continue
 			doc_name = office['name']
 			doc_location = office['address']
-			doc_practice = office['data']['identifier']
 			doc_contact = remSpCh(office['phone'])
-			big_data.append([doc_name,doc_practice,doc_location,date,doc_contact])
+			big_data.append([doc_name,zipcode,doc_location,date,doc_contact])
 			doctors.append(doc_name)
-			hospitals.append(doc_practice)
 		update_zip_info(excelFile,wb,big_data)
-	updateDashboard(excelFile, wb, doctors, hospitals)
+	updateDashboard(excelFile, wb, doctors)
 
 conformis()
 print("\n\nExecution Time: --- %2.f seconds ---\n" % (time.time() - start_time))
